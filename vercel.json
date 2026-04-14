@@ -1,5 +1,10 @@
 {
   "buildCommand": "next build",
   "outputDirectory": ".next",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "functions": {
+    "pages/api/dashboard.js": {
+      "maxDuration": 60
+    }
+  }
 }
