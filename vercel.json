@@ -2,9 +2,18 @@
   "buildCommand": "next build",
   "outputDirectory": ".next",
   "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/refresh?secret=gocomet2024secure",
+      "schedule": "0 2 * * *"
+    }
+  ],
   "functions": {
     "pages/api/dashboard.js": {
-      "maxDuration": 60
+      "maxDuration": 300
+    },
+    "pages/api/refresh.js": {
+      "maxDuration": 300
     }
   }
 }
