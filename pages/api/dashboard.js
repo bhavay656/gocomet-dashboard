@@ -35,7 +35,6 @@ export default async function handler(req, res) {
     return res.status(200).json(cache);
   } catch (err) {
     console.error('Dashboard error:', err);
-    // If we have stale cache, return it rather than erroring
     if (cache) {
       res.setHeader('X-Cache', 'STALE');
       return res.status(200).json({

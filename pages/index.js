@@ -16,7 +16,7 @@ const PRODUCTS = [
   'Cargo Tracking','Contact Us / Generic','Other'
 ];
 
-function pct(a, b) { return b ? (a / b * 100).toFixed(1) + '%' : '—'; }
+function pct(a, b) { return b ? (a / b * 100).toFixed(1) + '%' : '\u2014'; }
 
 export default function Dashboard() {
   const [raw, setRaw] = useState(null);
@@ -39,7 +39,7 @@ export default function Dashboard() {
   if (loading) return (
     <div className="loading">
       <div className="spinner" />
-      <p>Fetching live data from HubSpot&hellip;</p>
+      <p>Fetching live data from HubSpot\u2026</p>
       <p className="sub">Pulling 16 months of inbound leads</p>
       <style jsx>{`
         .loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;font-size:15px;color:#666;font-family:system-ui,sans-serif}
@@ -54,7 +54,7 @@ export default function Dashboard() {
     <div className="err">
       <h2>Error loading data</h2>
       <p>{error}</p>
-      <p>Check that HUBSPOT_API_KEY is set in Vercel &rarr; Project &rarr; Environment Variables, then redeploy.</p>
+      <p>Check that HUBSPOT_API_KEY is set in Vercel, then redeploy.</p>
       <style jsx>{`.err{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:12px;padding:24px;text-align:center;font-family:system-ui,sans-serif}h2{color:#e74c3c}`}</style>
     </div>
   );
@@ -98,10 +98,10 @@ export default function Dashboard() {
   function segAm(m, seg)  { return m.total > 0 ? Math.round(m.America * ((m.segFunnel[seg]?.leads||0) / m.total)) : 0; }
 
   function MoMCell({ cur, prev }) {
-    const d = prev ? ((cur - prev) / prev * 100).toFixed(1) : null;
-    if (d === null) return '—';
+    const d = prev !== null && prev !== undefined ? ((cur - prev) / (prev || 1) * 100).toFixed(1) : null;
+    if (d === null) return '\u2014';
     const n = parseFloat(d);
-    return <span className={n > 0 ? 'up' : n < 0 ? 'dn' : ''}>{n > 0 ? '▲' : n < 0 ? '▼' : ''}{Math.abs(d)}%</span>;
+    return <span className={n > 0 ? 'up' : n < 0 ? 'dn' : ''}>{n > 0 ? '\u25b2' : n < 0 ? '\u25bc' : ''}{Math.abs(d)}%</span>;
   }
 
   return (
@@ -111,12 +111,11 @@ export default function Dashboard() {
           <h1>Inbound Leads Dashboard</h1>
           <div className="live">
             <span className="dot" />
-            Live &middot; HubSpot &middot; {fetchedAt ? `Updated ${new Date(fetchedAt).toLocaleTimeString()}` : 'Auto-refresh every 30 min'}
+            Live &middot; HubSpot &middot; {fetchedAt ? `Updated ${new Date(fetchedAt).toLocaleTimeString()}` : 'Cached 1 hr'}
           </div>
         </div>
       </div>
 
-      {/* KPI cards */}
       <div className="kpis">
         {[
           { label: 'Total leads',    val: totals.total.toLocaleString(),    sub: 'Last 16 months' },
@@ -133,8 +132,6 @@ export default function Dashboard() {
       </div>
 
       <div className="grid">
-
-        {/* Trend line */}
         <div className="card full">
           <div className="ct">Monthly leads &mdash; ROW vs Americas</div>
           <div className="leg">
@@ -146,7 +143,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Segment donut */}
         <div className="card">
           <div className="ct">Segment mix</div>
           <div className="leg">{SEGS.map(s=><span key={s}><b style={{background:SEG_COLORS[s]}}/>{s} {allSegs[s].toLocaleString()}</span>)}</div>
@@ -155,7 +151,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Product donut */}
         <div className="card">
           <div className="ct">Product breakdown</div>
           <div className="leg">{sortedProds.slice(0,5).map(([k],i)=><span key={k}><b style={{background:PROD_COLORS[i]}}/>{k}</span>)}</div>
@@ -164,9 +159,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Funnel bar */}
         <div className="card full">
-          <div className="ct">Funnel by segment &mdash; Leads &rarr; Meetings &rarr; Deals/DM</div>
+          <div className="ct">Funnel by segment &mdash; Leads \u2192 Meetings \u2192 Deals/DM</div>
           <div className="leg">
             <span><b style={{background:'#b5d4f4'}}/>Leads</span>
             <span><b style={{background:'#378add'}}/>Meetings</span>
@@ -177,205 +171,152 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* TABLE 1: Overall MoM */}
         <div className="card full">
           <div className="ct tbl-head">Overall &mdash; Month over Month</div>
-          <div className="tw">
-            <table>
-              <thead>
-                <tr>
-                  <th>Month</th><th>Total</th><th>MoM</th>
-                  <th>ROW</th><th>Americas</th>
-                  <th>Enterprise</th><th>Mid-Market</th><th>SMB</th><th>Not Found</th>
-                  <th>Meetings</th><th>Lead&rarr;Mtg%</th>
-                  <th>Deals</th><th>Mtg&rarr;DM%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {raw.map((m,i) => (
-                  <tr key={m.key}>
-                    <td className="mc">{m.label}</td>
-                    <td><strong>{m.total.toLocaleString()}</strong></td>
-                    <td><MoMCell cur={m.total} prev={i>0?raw[i-1].total:null}/></td>
-                    <td>{m.ROW.toLocaleString()}</td>
-                    <td>{m.America.toLocaleString()}</td>
-                    <td>{(m.segments.Enterprise||0).toLocaleString()}</td>
-                    <td>{(m.segments['Mid-Market']||0).toLocaleString()}</td>
-                    <td>{(m.segments['Startup/SMB']||0).toLocaleString()}</td>
-                    <td>{(m.segments['Not Found']||0).toLocaleString()}</td>
-                    <td>{m.meetings.toLocaleString()}</td>
-                    <td>{pct(m.meetings,m.total)}</td>
-                    <td>{m.deals.toLocaleString()}</td>
-                    <td>{pct(m.deals,m.meetings)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <div className="tw"><table>
+            <thead><tr>
+              <th>Month</th><th>Total</th><th>MoM</th>
+              <th>ROW</th><th>Americas</th>
+              <th>Enterprise</th><th>Mid-Market</th><th>SMB</th><th>Not Found</th>
+              <th>Meetings</th><th>Lead\u2192Mtg%</th>
+              <th>Deals</th><th>Mtg\u2192DM%</th>
+            </tr></thead>
+            <tbody>{raw.map((m,i) => (
+              <tr key={m.key}>
+                <td className="mc">{m.label}</td>
+                <td><strong>{m.total.toLocaleString()}</strong></td>
+                <td><MoMCell cur={m.total} prev={i>0?raw[i-1].total:null}/></td>
+                <td>{m.ROW.toLocaleString()}</td>
+                <td>{m.America.toLocaleString()}</td>
+                <td>{(m.segments.Enterprise||0).toLocaleString()}</td>
+                <td>{(m.segments['Mid-Market']||0).toLocaleString()}</td>
+                <td>{(m.segments['Startup/SMB']||0).toLocaleString()}</td>
+                <td>{(m.segments['Not Found']||0).toLocaleString()}</td>
+                <td>{m.meetings.toLocaleString()}</td>
+                <td>{pct(m.meetings,m.total)}</td>
+                <td>{m.deals.toLocaleString()}</td>
+                <td>{pct(m.deals,m.meetings)}</td>
+              </tr>
+            ))}</tbody>
+          </table></div>
         </div>
 
-        {/* TABLE 2: Enterprise MoM */}
         <div className="card full">
           <div className="ct tbl-head">Enterprise &mdash; Month over Month</div>
-          <div className="tw">
-            <table>
-              <thead>
-                <tr>
-                  <th>Month</th><th>Leads</th><th>MoM</th>
-                  <th>ROW</th><th>Americas</th>
-                  <th>Meetings</th><th>Lead&rarr;Mtg%</th>
-                  <th>Deals</th><th>Mtg&rarr;DM%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {raw.map((m,i) => {
-                  const sf = m.segFunnel['Enterprise'] || {};
-                  const leads = sf.leads || 0;
-                  return (
-                    <tr key={m.key}>
-                      <td className="mc">{m.label}</td>
-                      <td><strong>{leads.toLocaleString()}</strong></td>
-                      <td><MoMCell cur={leads} prev={i>0?(raw[i-1].segFunnel['Enterprise']?.leads||0):null}/></td>
-                      <td>{segROW(m,'Enterprise').toLocaleString()}</td>
-                      <td>{segAm(m,'Enterprise').toLocaleString()}</td>
-                      <td>{(sf.meetings||0).toLocaleString()}</td>
-                      <td>{pct(sf.meetings||0,leads)}</td>
-                      <td>{(sf.deals||0).toLocaleString()}</td>
-                      <td>{pct(sf.deals||0,sf.meetings||0)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <div className="tw"><table>
+            <thead><tr>
+              <th>Month</th><th>Leads</th><th>MoM</th>
+              <th>ROW</th><th>Americas</th>
+              <th>Meetings</th><th>Lead\u2192Mtg%</th>
+              <th>Deals</th><th>Mtg\u2192DM%</th>
+            </tr></thead>
+            <tbody>{raw.map((m,i) => {
+              const sf = m.segFunnel['Enterprise'] || {};
+              const leads = sf.leads || 0;
+              return (<tr key={m.key}>
+                <td className="mc">{m.label}</td>
+                <td><strong>{leads.toLocaleString()}</strong></td>
+                <td><MoMCell cur={leads} prev={i>0?(raw[i-1].segFunnel['Enterprise']?.leads||0):null}/></td>
+                <td>{segROW(m,'Enterprise').toLocaleString()}</td>
+                <td>{segAm(m,'Enterprise').toLocaleString()}</td>
+                <td>{(sf.meetings||0).toLocaleString()}</td>
+                <td>{pct(sf.meetings||0,leads)}</td>
+                <td>{(sf.deals||0).toLocaleString()}</td>
+                <td>{pct(sf.deals||0,sf.meetings||0)}</td>
+              </tr>);
+            })}</tbody>
+          </table></div>
         </div>
 
-        {/* TABLE 3: Mid-Market MoM */}
         <div className="card full">
           <div className="ct tbl-head">Mid-Market &mdash; Month over Month</div>
-          <div className="tw">
-            <table>
-              <thead>
-                <tr>
-                  <th>Month</th><th>Leads</th><th>MoM</th>
-                  <th>ROW</th><th>Americas</th>
-                  <th>Meetings</th><th>Lead&rarr;Mtg%</th>
-                  <th>Deals</th><th>Mtg&rarr;DM%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {raw.map((m,i) => {
-                  const sf = m.segFunnel['Mid-Market'] || {};
-                  const leads = sf.leads || 0;
-                  return (
-                    <tr key={m.key}>
-                      <td className="mc">{m.label}</td>
-                      <td><strong>{leads.toLocaleString()}</strong></td>
-                      <td><MoMCell cur={leads} prev={i>0?(raw[i-1].segFunnel['Mid-Market']?.leads||0):null}/></td>
-                      <td>{segROW(m,'Mid-Market').toLocaleString()}</td>
-                      <td>{segAm(m,'Mid-Market').toLocaleString()}</td>
-                      <td>{(sf.meetings||0).toLocaleString()}</td>
-                      <td>{pct(sf.meetings||0,leads)}</td>
-                      <td>{(sf.deals||0).toLocaleString()}</td>
-                      <td>{pct(sf.deals||0,sf.meetings||0)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <div className="tw"><table>
+            <thead><tr>
+              <th>Month</th><th>Leads</th><th>MoM</th>
+              <th>ROW</th><th>Americas</th>
+              <th>Meetings</th><th>Lead\u2192Mtg%</th>
+              <th>Deals</th><th>Mtg\u2192DM%</th>
+            </tr></thead>
+            <tbody>{raw.map((m,i) => {
+              const sf = m.segFunnel['Mid-Market'] || {};
+              const leads = sf.leads || 0;
+              return (<tr key={m.key}>
+                <td className="mc">{m.label}</td>
+                <td><strong>{leads.toLocaleString()}</strong></td>
+                <td><MoMCell cur={leads} prev={i>0?(raw[i-1].segFunnel['Mid-Market']?.leads||0):null}/></td>
+                <td>{segROW(m,'Mid-Market').toLocaleString()}</td>
+                <td>{segAm(m,'Mid-Market').toLocaleString()}</td>
+                <td>{(sf.meetings||0).toLocaleString()}</td>
+                <td>{pct(sf.meetings||0,leads)}</td>
+                <td>{(sf.deals||0).toLocaleString()}</td>
+                <td>{pct(sf.deals||0,sf.meetings||0)}</td>
+              </tr>);
+            })}</tbody>
+          </table></div>
         </div>
 
-        {/* TABLE 4: Startup/SMB MoM */}
         <div className="card full">
           <div className="ct tbl-head">Startup / SMB &mdash; Month over Month</div>
-          <div className="tw">
-            <table>
-              <thead>
-                <tr>
-                  <th>Month</th><th>Leads</th><th>MoM</th>
-                  <th>ROW</th><th>Americas</th>
-                  <th>Meetings</th><th>Lead&rarr;Mtg%</th>
-                  <th>Deals</th><th>Mtg&rarr;DM%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {raw.map((m,i) => {
-                  const sf = m.segFunnel['Startup/SMB'] || {};
-                  const leads = sf.leads || 0;
-                  return (
-                    <tr key={m.key}>
-                      <td className="mc">{m.label}</td>
-                      <td><strong>{leads.toLocaleString()}</strong></td>
-                      <td><MoMCell cur={leads} prev={i>0?(raw[i-1].segFunnel['Startup/SMB']?.leads||0):null}/></td>
-                      <td>{segROW(m,'Startup/SMB').toLocaleString()}</td>
-                      <td>{segAm(m,'Startup/SMB').toLocaleString()}</td>
-                      <td>{(sf.meetings||0).toLocaleString()}</td>
-                      <td>{pct(sf.meetings||0,leads)}</td>
-                      <td>{(sf.deals||0).toLocaleString()}</td>
-                      <td>{pct(sf.deals||0,sf.meetings||0)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <div className="tw"><table>
+            <thead><tr>
+              <th>Month</th><th>Leads</th><th>MoM</th>
+              <th>ROW</th><th>Americas</th>
+              <th>Meetings</th><th>Lead\u2192Mtg%</th>
+              <th>Deals</th><th>Mtg\u2192DM%</th>
+            </tr></thead>
+            <tbody>{raw.map((m,i) => {
+              const sf = m.segFunnel['Startup/SMB'] || {};
+              const leads = sf.leads || 0;
+              return (<tr key={m.key}>
+                <td className="mc">{m.label}</td>
+                <td><strong>{leads.toLocaleString()}</strong></td>
+                <td><MoMCell cur={leads} prev={i>0?(raw[i-1].segFunnel['Startup/SMB']?.leads||0):null}/></td>
+                <td>{segROW(m,'Startup/SMB').toLocaleString()}</td>
+                <td>{segAm(m,'Startup/SMB').toLocaleString()}</td>
+                <td>{(sf.meetings||0).toLocaleString()}</td>
+                <td>{pct(sf.meetings||0,leads)}</td>
+                <td>{(sf.deals||0).toLocaleString()}</td>
+                <td>{pct(sf.deals||0,sf.meetings||0)}</td>
+              </tr>);
+            })}</tbody>
+          </table></div>
         </div>
 
-        {/* TABLE 5: Product MoM */}
         <div className="card full">
           <div className="ct tbl-head">Product &mdash; Month over Month</div>
-          <div className="tw">
-            <table>
-              <thead>
-                <tr>
-                  <th>Month</th>
-                  {PRODUCTS.map(p => <th key={p}>{p}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {raw.map(m => (
-                  <tr key={m.key}>
-                    <td className="mc">{m.label}</td>
-                    {PRODUCTS.map(p => (
-                      <td key={p}>{(m.products[p]||0).toLocaleString()}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <div className="tw"><table>
+            <thead><tr>
+              <th>Month</th>
+              {PRODUCTS.map(p => <th key={p}>{p}</th>)}
+            </tr></thead>
+            <tbody>{raw.map(m => (
+              <tr key={m.key}>
+                <td className="mc">{m.label}</td>
+                {PRODUCTS.map(p => <td key={p}>{(m.products[p]||0).toLocaleString()}</td>)}
+              </tr>
+            ))}</tbody>
+          </table></div>
         </div>
 
-        {/* Conversion ratios by segment */}
         <div className="card full">
           <div className="ct tbl-head">Conversion ratios by segment</div>
-          <div className="tw">
-            <table>
-              <thead>
-                <tr><th>Segment</th><th>Leads</th><th>Meetings</th><th>Lead&rarr;Mtg</th><th>Deals</th><th>Mtg&rarr;DM</th></tr>
-              </thead>
-              <tbody>
-                {SEGS.map(s => {
-                  const leads = raw.reduce((sum,m)=>sum+(m.segFunnel[s]?.leads||0),0);
-                  const mtgs  = raw.reduce((sum,m)=>sum+(m.segFunnel[s]?.meetings||0),0);
-                  const dls   = raw.reduce((sum,m)=>sum+(m.segFunnel[s]?.deals||0),0);
-                  return (
-                    <tr key={s}>
-                      <td><span className={`pill p-${s.replace('/','').replace(/ /g,'-').toLowerCase()}`}>{s}</span></td>
-                      <td>{leads.toLocaleString()}</td>
-                      <td>{mtgs.toLocaleString()}</td>
-                      <td>{pct(mtgs,leads)}</td>
-                      <td>{dls.toLocaleString()}</td>
-                      <td>{pct(dls,mtgs)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <div className="tw"><table>
+            <thead><tr><th>Segment</th><th>Leads</th><th>Meetings</th><th>Lead\u2192Mtg</th><th>Deals</th><th>Mtg\u2192DM</th></tr></thead>
+            <tbody>{SEGS.map(s => {
+              const leads = raw.reduce((sum,m)=>sum+(m.segFunnel[s]?.leads||0),0);
+              const mtgs  = raw.reduce((sum,m)=>sum+(m.segFunnel[s]?.meetings||0),0);
+              const dls   = raw.reduce((sum,m)=>sum+(m.segFunnel[s]?.deals||0),0);
+              return (<tr key={s}>
+                <td><span className={`pill p-${s.replace('/','').replace(/ /g,'-').toLowerCase()}`}>{s}</span></td>
+                <td>{leads.toLocaleString()}</td>
+                <td>{mtgs.toLocaleString()}</td>
+                <td>{pct(mtgs,leads)}</td>
+                <td>{dls.toLocaleString()}</td>
+                <td>{pct(dls,mtgs)}</td>
+              </tr>);
+            })}</tbody>
+          </table></div>
         </div>
-
       </div>
 
       <style jsx>{`
