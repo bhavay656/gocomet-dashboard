@@ -10,6 +10,11 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarEleme
 const SEGS = ['Enterprise', 'Mid-Market', 'Startup/SMB', 'Not Found'];
 const SEG_COLORS = { Enterprise: '#378add', 'Mid-Market': '#7f77dd', 'Startup/SMB': '#639922', 'Not Found': '#888780' };
 const PROD_COLORS = ['#378add','#d85a30','#7f77dd','#639922','#ba7517','#0f6e56','#993556','#888780','#5f5e5a'];
+const PRODUCTS = [
+  'Container Tracking','Port Congestion','Sailing Schedule',
+  'Freight Rates / GFI','Freight Quotation','Vessel Tracking',
+  'Cargo Tracking','Contact Us / Generic','Other'
+];
 
 function pct(a, b) { return b ? (a / b * 100).toFixed(1) + '%' : '—'; }
 
@@ -18,9 +23,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [fetchedAt, setFetchedAt] = useState(null);
-  const [region, setRegion] = useState('ALL');
-  const [seg, setSeg] = useState('ALL');
-  const [product, setProduct] = useState('ALL');
 
   useEffect(() => {
     fetch('/api/dashboard')
@@ -57,55 +59,20 @@ export default function Dashboard() {
     </div>
   );
 
-  const filtered = raw.map(m => {
-    let ratio = 1;
-    if (region === 'ROW') ratio = m.total > 0 ? m.ROW / m.total : 0;
-    if (region === 'America') ratio = m.total > 0 ? m.America / m.total : 0;
-
-    let total = region === 'ALL' ? m.total : region === 'ROW' ? m.ROW : m.America;
-    let meetings = Math.round(m.meetings * ratio);
-    let deals = Math.round(m.deals * ratio);
-    const segments = {};
-    SEGS.forEach(s => { segments[s] = Math.round((m.segments[s] || 0) * ratio); });
-    const segFunnel = {};
-    SEGS.forEach(s => {
-      segFunnel[s] = {
-        leads: Math.round((m.segFunnel[s]?.leads || 0) * ratio),
-        meetings: Math.round((m.segFunnel[s]?.meetings || 0) * ratio),
-        deals: Math.round((m.segFunnel[s]?.deals || 0) * ratio),
-      };
-    });
-
-    if (seg !== 'ALL') {
-      total = segFunnel[seg]?.leads || 0;
-      meetings = segFunnel[seg]?.meetings || 0;
-      deals = segFunnel[seg]?.deals || 0;
-    }
-
-    if (product !== 'ALL') {
-      const pr = m.total > 0 ? (m.products[product] || 0) / m.total : 0;
-      total = Math.round(total * pr);
-      meetings = Math.round(meetings * pr);
-      deals = Math.round(deals * pr);
-    }
-
-    return { ...m, total, meetings, deals, segments, segFunnel };
-  });
-
-  const totals = filtered.reduce((a, m) => ({ total: a.total+m.total, meetings: a.meetings+m.meetings, deals: a.deals+m.deals }), { total:0, meetings:0, deals:0 });
+  const totals   = raw.reduce((a, m) => ({ total: a.total+m.total, meetings: a.meetings+m.meetings, deals: a.deals+m.deals }), { total:0, meetings:0, deals:0 });
   const totalROW = raw.reduce((s, m) => s + m.ROW, 0);
-  const totalAm = raw.reduce((s, m) => s + m.America, 0);
-  const labels = filtered.map(m => m.label);
+  const totalAm  = raw.reduce((s, m) => s + m.America, 0);
+  const labels   = raw.map(m => m.label);
 
   const trendData = {
     labels,
     datasets: [
-      { label: 'ROW', data: raw.map(m => m.ROW), borderColor: '#378add', backgroundColor: 'rgba(55,138,221,0.08)', fill: true, tension: 0.35, pointRadius: 3, borderWidth: 2 },
-      { label: 'Americas', data: raw.map(m => m.America), borderColor: '#d85a30', backgroundColor: 'rgba(216,90,48,0.08)', fill: true, tension: 0.35, pointRadius: 3, borderWidth: 2, borderDash: [5,3] },
+      { label: 'ROW',      data: raw.map(m => m.ROW),     borderColor: '#378add', backgroundColor: 'rgba(55,138,221,0.08)', fill: true, tension: 0.35, pointRadius: 3, borderWidth: 2 },
+      { label: 'Americas', data: raw.map(m => m.America), borderColor: '#d85a30', backgroundColor: 'rgba(216,90,48,0.08)',  fill: true, tension: 0.35, pointRadius: 3, borderWidth: 2, borderDash: [5,3] },
     ]
   };
 
-  const allSegs = SEGS.reduce((a, s) => { a[s] = filtered.reduce((sum, m) => sum + (m.segments[s]||0), 0); return a; }, {});
+  const allSegs = SEGS.reduce((a, s) => { a[s] = raw.reduce((sum, m) => sum + (m.segments[s]||0), 0); return a; }, {});
   const segData = { labels: SEGS, datasets: [{ data: SEGS.map(s => allSegs[s]), backgroundColor: SEGS.map(s => SEG_COLORS[s]), borderWidth: 1 }] };
 
   const allProds = {};
@@ -119,14 +86,23 @@ export default function Dashboard() {
   const funnelData = {
     labels: ['Enterprise','Mid-Market','SMB','N/F'],
     datasets: [
-      { label: 'Leads', data: SEGS.map(s => filtered.reduce((sum,m)=>sum+(m.segFunnel[s]?.leads||0),0)), backgroundColor: '#b5d4f4', borderWidth: 0 },
-      { label: 'Meetings', data: SEGS.map(s => filtered.reduce((sum,m)=>sum+(m.segFunnel[s]?.meetings||0),0)), backgroundColor: '#378add', borderWidth: 0 },
-      { label: 'Deals/DM', data: SEGS.map(s => filtered.reduce((sum,m)=>sum+(m.segFunnel[s]?.deals||0),0)), backgroundColor: '#0c447c', borderWidth: 0 },
+      { label: 'Leads',    data: SEGS.map(s => raw.reduce((sum,m)=>sum+(m.segFunnel[s]?.leads||0),0)),    backgroundColor: '#b5d4f4', borderWidth: 0 },
+      { label: 'Meetings', data: SEGS.map(s => raw.reduce((sum,m)=>sum+(m.segFunnel[s]?.meetings||0),0)), backgroundColor: '#378add', borderWidth: 0 },
+      { label: 'Deals/DM', data: SEGS.map(s => raw.reduce((sum,m)=>sum+(m.segFunnel[s]?.deals||0),0)),    backgroundColor: '#0c447c', borderWidth: 0 },
     ]
   };
 
   const baseOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
-  const allProdsForFilter = [...new Set(raw.flatMap(m => Object.keys(m.products||{})))].sort();
+
+  function segROW(m, seg) { return m.total > 0 ? Math.round(m.ROW     * ((m.segFunnel[seg]?.leads||0) / m.total)) : 0; }
+  function segAm(m, seg)  { return m.total > 0 ? Math.round(m.America * ((m.segFunnel[seg]?.leads||0) / m.total)) : 0; }
+
+  function MoMCell({ cur, prev }) {
+    const d = prev ? ((cur - prev) / prev * 100).toFixed(1) : null;
+    if (d === null) return '—';
+    const n = parseFloat(d);
+    return <span className={n > 0 ? 'up' : n < 0 ? 'dn' : ''}>{n > 0 ? '▲' : n < 0 ? '▼' : ''}{Math.abs(d)}%</span>;
+  }
 
   return (
     <div className="dash">
@@ -138,37 +114,14 @@ export default function Dashboard() {
             Live &middot; HubSpot &middot; {fetchedAt ? `Updated ${new Date(fetchedAt).toLocaleTimeString()}` : 'Auto-refresh every 30 min'}
           </div>
         </div>
-        <div className="controls">
-          <div className="cg">
-            <span className="lbl">Region</span>
-            {['ALL','ROW','America'].map(r => (
-              <button key={r} className={`tab${region===r?' on':''}`} onClick={() => setRegion(r)}>
-                {r==='ALL'?'All':r==='America'?'Americas':r}
-              </button>
-            ))}
-          </div>
-          <div className="cg">
-            <span className="lbl">Segment</span>
-            <select value={seg} onChange={e => setSeg(e.target.value)}>
-              <option value="ALL">All segments</option>
-              {SEGS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div className="cg">
-            <span className="lbl">Product</span>
-            <select value={product} onChange={e => setProduct(e.target.value)}>
-              <option value="ALL">All products</option>
-              {allProdsForFilter.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
-        </div>
       </div>
 
+      {/* KPI cards */}
       <div className="kpis">
         {[
-          { label: 'Total leads', val: totals.total.toLocaleString(), sub: 'Last 16 months' },
-          { label: 'Meetings set', val: totals.meetings.toLocaleString(), sub: `Lead\u2192Mtg ${pct(totals.meetings, totals.total)}` },
-          { label: 'Deals / DM', val: totals.deals.toLocaleString(), sub: `Mtg\u2192DM ${pct(totals.deals, totals.meetings)}` },
+          { label: 'Total leads',    val: totals.total.toLocaleString(),    sub: 'Last 16 months' },
+          { label: 'Meetings set',   val: totals.meetings.toLocaleString(), sub: `Lead\u2192Mtg ${pct(totals.meetings, totals.total)}` },
+          { label: 'Deals / DM',     val: totals.deals.toLocaleString(),    sub: `Mtg\u2192DM ${pct(totals.deals, totals.meetings)}` },
           { label: 'ROW / Americas', val: `${totalROW.toLocaleString()} / ${totalAm.toLocaleString()}`, sub: `${pct(totalROW, totalROW+totalAm)} ROW` },
         ].map((k,i) => (
           <div key={i} className="kpi">
@@ -180,6 +133,8 @@ export default function Dashboard() {
       </div>
 
       <div className="grid">
+
+        {/* Trend line */}
         <div className="card full">
           <div className="ct">Monthly leads &mdash; ROW vs Americas</div>
           <div className="leg">
@@ -191,6 +146,7 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Segment donut */}
         <div className="card">
           <div className="ct">Segment mix</div>
           <div className="leg">{SEGS.map(s=><span key={s}><b style={{background:SEG_COLORS[s]}}/>{s} {allSegs[s].toLocaleString()}</span>)}</div>
@@ -199,6 +155,7 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Product donut */}
         <div className="card">
           <div className="ct">Product breakdown</div>
           <div className="leg">{sortedProds.slice(0,5).map(([k],i)=><span key={k}><b style={{background:PROD_COLORS[i]}}/>{k}</span>)}</div>
@@ -207,6 +164,7 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Funnel bar */}
         <div className="card full">
           <div className="ct">Funnel by segment &mdash; Leads &rarr; Meetings &rarr; Deals/DM</div>
           <div className="leg">
@@ -219,37 +177,71 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* TABLE 1: Overall MoM */}
         <div className="card full">
-          <div className="ct">Month-over-month table</div>
+          <div className="ct tbl-head">Overall &mdash; Month over Month</div>
           <div className="tw">
             <table>
               <thead>
                 <tr>
                   <th>Month</th><th>Total</th><th>MoM</th>
                   <th>ROW</th><th>Americas</th>
-                  <th>Enterprise</th><th>Mid-Market</th><th>SMB</th>
-                  <th>Meetings</th><th>Lead&rarr;Mtg</th>
-                  <th>Deals</th><th>Mtg&rarr;DM</th>
+                  <th>Enterprise</th><th>Mid-Market</th><th>SMB</th><th>Not Found</th>
+                  <th>Meetings</th><th>Lead&rarr;Mtg%</th>
+                  <th>Deals</th><th>Mtg&rarr;DM%</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((m,i) => {
-                  const prev = i > 0 ? filtered[i-1].total : null;
-                  const d = prev ? ((m.total-prev)/prev*100).toFixed(1) : null;
+                {raw.map((m,i) => (
+                  <tr key={m.key}>
+                    <td className="mc">{m.label}</td>
+                    <td><strong>{m.total.toLocaleString()}</strong></td>
+                    <td><MoMCell cur={m.total} prev={i>0?raw[i-1].total:null}/></td>
+                    <td>{m.ROW.toLocaleString()}</td>
+                    <td>{m.America.toLocaleString()}</td>
+                    <td>{(m.segments.Enterprise||0).toLocaleString()}</td>
+                    <td>{(m.segments['Mid-Market']||0).toLocaleString()}</td>
+                    <td>{(m.segments['Startup/SMB']||0).toLocaleString()}</td>
+                    <td>{(m.segments['Not Found']||0).toLocaleString()}</td>
+                    <td>{m.meetings.toLocaleString()}</td>
+                    <td>{pct(m.meetings,m.total)}</td>
+                    <td>{m.deals.toLocaleString()}</td>
+                    <td>{pct(m.deals,m.meetings)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* TABLE 2: Enterprise MoM */}
+        <div className="card full">
+          <div className="ct tbl-head">Enterprise &mdash; Month over Month</div>
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>Month</th><th>Leads</th><th>MoM</th>
+                  <th>ROW</th><th>Americas</th>
+                  <th>Meetings</th><th>Lead&rarr;Mtg%</th>
+                  <th>Deals</th><th>Mtg&rarr;DM%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {raw.map((m,i) => {
+                  const sf = m.segFunnel['Enterprise'] || {};
+                  const leads = sf.leads || 0;
                   return (
                     <tr key={m.key}>
                       <td className="mc">{m.label}</td>
-                      <td><strong>{m.total.toLocaleString()}</strong></td>
-                      <td>{d===null?'—':<span className={parseFloat(d)>0?'up':parseFloat(d)<0?'dn':''}>{parseFloat(d)>0?'▲':parseFloat(d)<0?'▼':''}{Math.abs(d)}%</span>}</td>
-                      <td>{m.ROW.toLocaleString()}</td>
-                      <td>{m.America.toLocaleString()}</td>
-                      <td>{(m.segments.Enterprise||0).toLocaleString()}</td>
-                      <td>{(m.segments['Mid-Market']||0).toLocaleString()}</td>
-                      <td>{(m.segments['Startup/SMB']||0).toLocaleString()}</td>
-                      <td>{m.meetings.toLocaleString()}</td>
-                      <td>{pct(m.meetings,m.total)}</td>
-                      <td>{m.deals.toLocaleString()}</td>
-                      <td>{pct(m.deals,m.meetings)}</td>
+                      <td><strong>{leads.toLocaleString()}</strong></td>
+                      <td><MoMCell cur={leads} prev={i>0?(raw[i-1].segFunnel['Enterprise']?.leads||0):null}/></td>
+                      <td>{segROW(m,'Enterprise').toLocaleString()}</td>
+                      <td>{segAm(m,'Enterprise').toLocaleString()}</td>
+                      <td>{(sf.meetings||0).toLocaleString()}</td>
+                      <td>{pct(sf.meetings||0,leads)}</td>
+                      <td>{(sf.deals||0).toLocaleString()}</td>
+                      <td>{pct(sf.deals||0,sf.meetings||0)}</td>
                     </tr>
                   );
                 })}
@@ -258,8 +250,106 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* TABLE 3: Mid-Market MoM */}
         <div className="card full">
-          <div className="ct">Conversion ratios by segment</div>
+          <div className="ct tbl-head">Mid-Market &mdash; Month over Month</div>
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>Month</th><th>Leads</th><th>MoM</th>
+                  <th>ROW</th><th>Americas</th>
+                  <th>Meetings</th><th>Lead&rarr;Mtg%</th>
+                  <th>Deals</th><th>Mtg&rarr;DM%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {raw.map((m,i) => {
+                  const sf = m.segFunnel['Mid-Market'] || {};
+                  const leads = sf.leads || 0;
+                  return (
+                    <tr key={m.key}>
+                      <td className="mc">{m.label}</td>
+                      <td><strong>{leads.toLocaleString()}</strong></td>
+                      <td><MoMCell cur={leads} prev={i>0?(raw[i-1].segFunnel['Mid-Market']?.leads||0):null}/></td>
+                      <td>{segROW(m,'Mid-Market').toLocaleString()}</td>
+                      <td>{segAm(m,'Mid-Market').toLocaleString()}</td>
+                      <td>{(sf.meetings||0).toLocaleString()}</td>
+                      <td>{pct(sf.meetings||0,leads)}</td>
+                      <td>{(sf.deals||0).toLocaleString()}</td>
+                      <td>{pct(sf.deals||0,sf.meetings||0)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* TABLE 4: Startup/SMB MoM */}
+        <div className="card full">
+          <div className="ct tbl-head">Startup / SMB &mdash; Month over Month</div>
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>Month</th><th>Leads</th><th>MoM</th>
+                  <th>ROW</th><th>Americas</th>
+                  <th>Meetings</th><th>Lead&rarr;Mtg%</th>
+                  <th>Deals</th><th>Mtg&rarr;DM%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {raw.map((m,i) => {
+                  const sf = m.segFunnel['Startup/SMB'] || {};
+                  const leads = sf.leads || 0;
+                  return (
+                    <tr key={m.key}>
+                      <td className="mc">{m.label}</td>
+                      <td><strong>{leads.toLocaleString()}</strong></td>
+                      <td><MoMCell cur={leads} prev={i>0?(raw[i-1].segFunnel['Startup/SMB']?.leads||0):null}/></td>
+                      <td>{segROW(m,'Startup/SMB').toLocaleString()}</td>
+                      <td>{segAm(m,'Startup/SMB').toLocaleString()}</td>
+                      <td>{(sf.meetings||0).toLocaleString()}</td>
+                      <td>{pct(sf.meetings||0,leads)}</td>
+                      <td>{(sf.deals||0).toLocaleString()}</td>
+                      <td>{pct(sf.deals||0,sf.meetings||0)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* TABLE 5: Product MoM */}
+        <div className="card full">
+          <div className="ct tbl-head">Product &mdash; Month over Month</div>
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  {PRODUCTS.map(p => <th key={p}>{p}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {raw.map(m => (
+                  <tr key={m.key}>
+                    <td className="mc">{m.label}</td>
+                    {PRODUCTS.map(p => (
+                      <td key={p}>{(m.products[p]||0).toLocaleString()}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Conversion ratios by segment */}
+        <div className="card full">
+          <div className="ct tbl-head">Conversion ratios by segment</div>
           <div className="tw">
             <table>
               <thead>
@@ -267,9 +357,9 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {SEGS.map(s => {
-                  const leads = filtered.reduce((sum,m)=>sum+(m.segFunnel[s]?.leads||0),0);
-                  const mtgs = filtered.reduce((sum,m)=>sum+(m.segFunnel[s]?.meetings||0),0);
-                  const dls = filtered.reduce((sum,m)=>sum+(m.segFunnel[s]?.deals||0),0);
+                  const leads = raw.reduce((sum,m)=>sum+(m.segFunnel[s]?.leads||0),0);
+                  const mtgs  = raw.reduce((sum,m)=>sum+(m.segFunnel[s]?.meetings||0),0);
+                  const dls   = raw.reduce((sum,m)=>sum+(m.segFunnel[s]?.deals||0),0);
                   return (
                     <tr key={s}>
                       <td><span className={`pill p-${s.replace('/','').replace(/ /g,'-').toLowerCase()}`}>{s}</span></td>
@@ -285,6 +375,7 @@ export default function Dashboard() {
             </table>
           </div>
         </div>
+
       </div>
 
       <style jsx>{`
@@ -295,12 +386,6 @@ export default function Dashboard() {
         h1{font-size:20px;font-weight:600}
         .live{font-size:12px;color:#888;display:flex;align-items:center;gap:6px;margin-top:4px}
         .dot{width:7px;height:7px;border-radius:50%;background:#27ae60;display:inline-block}
-        .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-        .cg{display:flex;gap:4px;align-items:center}
-        .lbl{font-size:11px;color:#888;margin-right:2px;white-space:nowrap}
-        .tab{padding:5px 12px;border-radius:6px;border:1px solid #ddd;background:transparent;cursor:pointer;font-size:12px;color:#666}
-        .tab.on{background:#1a1a1a;color:#fff;border-color:#1a1a1a;font-weight:500}
-        select{font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #ddd;background:#fff;color:#1a1a1a;cursor:pointer}
         .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
         .kpi{background:#fff;border-radius:10px;padding:14px 16px;border:1px solid #eee;box-shadow:0 1px 3px rgba(0,0,0,.05)}
         .kpi-l{font-size:11px;color:#888;margin-bottom:6px}
@@ -310,13 +395,14 @@ export default function Dashboard() {
         .card{background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
         .full{grid-column:1/-1}
         .ct{font-size:13px;font-weight:600;margin-bottom:10px}
+        .tbl-head{font-size:14px;font-weight:700;color:#1a1a1a;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #f0f0f0}
         .leg{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px;font-size:11px;color:#666}
         .leg span{display:flex;align-items:center;gap:4px}
         .leg b{width:9px;height:9px;border-radius:2px;flex-shrink:0;display:inline-block}
         .tw{overflow-x:auto}
         table{width:100%;border-collapse:collapse;font-size:12px}
         th{font-size:11px;font-weight:600;color:#888;text-align:left;padding:6px 8px;border-bottom:1px solid #eee;white-space:nowrap}
-        td{padding:7px 8px;border-bottom:1px solid #f5f5f5}
+        td{padding:7px 8px;border-bottom:1px solid #f5f5f5;white-space:nowrap}
         tr:last-child td{border-bottom:none}
         tr:hover td{background:#fafafa}
         .mc{font-weight:500;white-space:nowrap}
@@ -331,7 +417,7 @@ export default function Dashboard() {
           .kpis{grid-template-columns:1fr 1fr}
           .grid{grid-template-columns:1fr}
           .full{grid-column:1}
-          .topbar,.controls{flex-direction:column;align-items:flex-start}
+          .topbar{flex-direction:column;align-items:flex-start}
         }
       `}</style>
     </div>
